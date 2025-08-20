@@ -1,5 +1,24 @@
 {
+  "name": "fantasy-ciclismo-guardianes",
+  "version": "1.0.0",
+  "description": "Proyecto Fantasy Ciclismo Guardianes - scraping PCS y gestión de equipos",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "scrape:startlist": "node scrapeStartlist.js",
+    "parse:dump": "node parseStartlistFromDump.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "cycling",
+    "fantasy",
+    "scraping",
+    "pcs"
+  ],
+  "author": "Aanecas",
+  "license": "MIT",
   "dependencies": {
-    "googleapis": "^156.0.0"
+    "playwright": "^1.47.2",
+    "cheerio": "^1.0.0-rc.12"
   }
 }

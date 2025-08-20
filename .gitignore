@@ -1,0 +1,46 @@
+# =========================
+# Archivos y carpetas de Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+
+# Entorno virtual
+.venv/
+env/
+venv/
+
+# =========================
+# Archivos y carpetas de Node.js
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Archivos de datos (scraping y procesados)
+# =========================
+data/raw-*.html
+data/*.json
+data/*.csv
+data/*.xlsx
+
+# =========================
+# Archivos del sistema
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Credenciales y claves privadas
+# =========================
+credentials.json
+token.json
+*.pem
+*.key
+*.crt
+*.p12

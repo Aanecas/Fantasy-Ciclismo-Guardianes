@@ -1,0 +1,7 @@
+procyclingstats
+requests
+beautifulsoup4
+html5lib
+gspread==6.1.2
+google-auth==2.35.0
+google-auth-oauthlib==1.2.1
