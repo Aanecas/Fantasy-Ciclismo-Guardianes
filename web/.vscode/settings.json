@@ -1,0 +1,19 @@
+{
+  // Ignora reglas @tailwind / @apply como “desconocidas”
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+
+  // Usa el lenguaje PostCSS para archivos CSS del app dir (opcional pero útil)
+  "files.associations": {
+    "**/src/app/**/*.css": "postcss"
+  },
+
+  // Mejora de autocompletado de Tailwind (requiere la extensión oficial)
+  "tailwindCSS.includeLanguages": {
+    "plaintext": "html",
+    "typescriptreact": "javascript"
+  },
+  "editor.quickSuggestions": {
+    "strings": true
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "files.associations": {
+    "**/src/app/**/*.css": "postcss"
+  },
+  "tailwindCSS.experimental.configFile": "web/tailwind.config.ts"
+}

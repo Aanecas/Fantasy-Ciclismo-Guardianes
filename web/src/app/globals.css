@@ -1,0 +1,161 @@
+/* =========================================
+   Tailwind base
+========================================= */
+@import "tailwindcss";
+
+/* =========================================
+   Design tokens (paleta basada en tu logo)
+========================================= */
+:root{
+  /* Backgrounds */
+  --bg: #0B0B0F;
+  --surface: #111217;
+  --surface-2: #15161C;
+  --border: #1F2026;
+
+  /* Text */
+  --text: #EDEFF2;
+  --text-dim: #AEB3C2;
+
+  /* Brand (naranja → rojo) */
+  --pri-500:#FF7A00;
+  --pri-600:#FF5A00;
+  --pri-700:#FF3D00;
+  --pri-900:#C91D00;
+  --pri-glow:#FFA043;
+
+  /* Metal plata (para detalles tipo “R”) */
+  --metal-300:#E6E8EB;
+  --metal-500:#C6CBD4;
+  --metal-700:#8F98A3;
+
+  /* Estados */
+  --success:#2ED47A;
+  --warn:#FFC53D;
+  --danger:#FF4D4F;
+}
+
+/* =========================================
+   Global reset & base
+========================================= */
+html,body{height:100%;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  @apply antialiased;
+}
+*{-webkit-tap-highlight-color:transparent;}
+::selection{background:rgba(255,122,0,.35);color:#fff;}
+
+a{@apply transition-colors; color:var(--pri-500);}
+a:hover{color:var(--pri-700);}
+
+/* =========================================
+   Layout helpers
+========================================= */
+.container{@apply mx-auto max-w-7xl px-4;}
+.navbar{
+  @apply sticky top-0 z-40 backdrop-blur border-b;
+  border-color:var(--border);
+  background:rgba(17,18,23,.7);
+}
+
+/* =========================================
+   Cards
+========================================= */
+.card{
+  @apply rounded-2xl border p-6;
+  border-color:var(--border);
+  background:var(--surface);
+  box-shadow:0 8px 30px rgba(0,0,0,.25);
+}
+.card-hover{@apply transition-transform;}
+.card-hover:hover{
+  transform:translateY(-1px);
+  box-shadow:0 0 40px rgba(255,122,0,.18);
+}
+
+/* =========================================
+   Buttons
+========================================= */
+.btn{
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium
+         transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+  color:var(--text);
+  background:transparent;
+  border:1px solid var(--border);
+}
+.btn:disabled{opacity:.6;cursor:not-allowed;}
+
+.btn-primary{
+  color:#fff;
+  background:linear-gradient(135deg,var(--pri-500),var(--pri-700));
+  border-color:transparent;
+}
+.btn-primary:hover{filter:brightness(1.05); box-shadow:0 0 24px rgba(255,122,0,.25);}
+
+.btn-ghost{color:var(--text-dim); background:transparent;}
+.btn-ghost:hover{color:var(--text); background:rgba(255,255,255,.02);}
+
+.btn-secondary{color:var(--text); background:var(--surface-2); border-color:var(--border);}
+.btn-danger{color:#fff; background:var(--danger); border-color:transparent;}
+
+/* =========================================
+   Badges & pills
+========================================= */
+.badge{
+  @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.04);
+}
+.badge-primary{
+  background:rgba(255,122,0,.12);
+  border-color:rgba(255,122,0,.35);
+  color:var(--pri-glow);
+}
+
+/* =========================================
+   Headings & text helpers
+========================================= */
+.h1{@apply text-3xl font-bold tracking-tight;}
+.h2{@apply text-2xl font-semibold tracking-tight;}
+.h3{@apply text-xl font-semibold;}
+.subtle{color:var(--text-dim);}
+.kpi{@apply text-3xl font-bold tracking-tight;}
+
+/* =========================================
+   Forms
+========================================= */
+.input{
+  @apply w-full rounded-md px-3 py-2 shadow-sm;
+  background:var(--surface);
+  color:var(--text);
+  border:1px solid var(--border);
+}
+.input:focus{
+  outline:none;
+  border-color:var(--pri-500);
+  box-shadow:0 0 0 2px rgba(255,122,0,.35);
+}
+.select{
+  @apply w-full rounded-md px-3 py-2;
+  background:var(--surface);
+  color:var(--text);
+  border:1px solid var(--border);
+}
+
+/* =========================================
+   Tables
+========================================= */
+.table{@apply w-full border-collapse;}
+.table th,.table td{@apply px-4 py-2 text-left; border-bottom:1px solid var(--border);}
+.table th{color:var(--text-dim);}
+.table tr:hover td{background:rgba(255,255,255,.02);}
+
+/* =========================================
+   Utility backgrounds
+========================================= */
+.bg-brand-soft{
+  background:radial-gradient(60% 60% at 50% 0%, rgba(255,122,0,.18) 0%,
+    rgba(255,61,0,.06) 50%, transparent 100%);
+}
