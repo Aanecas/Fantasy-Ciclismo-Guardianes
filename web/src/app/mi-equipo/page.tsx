@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 
 type StartlistRow = {
   Rider: string;
@@ -18,6 +19,7 @@ type Config = {
 };
 
 export default function MiEquipoPage() {
+  const { status } = useSession(); // <-- clave para esperar a la sesión
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,38 +27,26 @@ export default function MiEquipoPage() {
 
   const [config, setConfig] = useState<Config | null>(null);
   const [rows, setRows] = useState<StartlistRow[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
 
-  const [selected, setSelected] = useState<string[]>([]); // Rider names
   const [q, setQ] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("Todos");
   const [teamFilter, setTeamFilter] = useState<string>("Todos");
 
-  // Carga Config + Startlist + Picks previos del usuario
+  // Carga Config y Startlist (no necesitan sesión)
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
         const [cfgRes, slRes] = await Promise.all([
-          fetch("/api/config").then((r) => r.json()),
-          fetch("/api/startlist").then((r) => r.json()),
+          fetch("/api/config", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/startlist", { cache: "no-store" }).then((r) => r.json()),
         ]);
         if (!cfgRes?.ok) throw new Error("No pude cargar la configuración");
         if (!slRes?.ok) throw new Error("No pude cargar la startlist");
 
         setConfig(cfgRes.config);
         setRows(slRes.rows || []);
-
-        // Cargar picks del usuario (si autenticado)
-        try {
-          const p = await fetch("/api/picks/mine").then((r) => r.json());
-          if (p?.ok && Array.isArray(p.picks)) {
-            const names = p.picks.map((x: any) => String(x.rider));
-            setSelected(names);
-          }
-        } catch {
-          // usuario no autenticado o sin picks: ignoramos
-        }
-
         setError(null);
       } catch (e: any) {
         setError(e?.message ?? "Error desconocido");
@@ -65,6 +55,38 @@ export default function MiEquipoPage() {
       }
     })();
   }, []);
+
+  // Carga tus picks SOLO cuando la sesión esté lista
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    (async () => {
+      try {
+        const p = await fetch("/api/picks/mine", { cache: "no-store" }).then((r) => r.json());
+        if (p?.ok && Array.isArray(p.riders)) {
+          setSelected(p.riders);
+        }
+      } catch {
+        // sin picks o no autenticado: ignorar
+      }
+    })();
+  }, [status]);
+
+  // Revalida picks al volver a la pestaña (por si guardaste y regresaste)
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const onVis = async () => {
+      if (document.visibilityState === "visible") {
+        try {
+          const p = await fetch("/api/picks/mine", { cache: "no-store" }).then((r) => r.json());
+          if (p?.ok && Array.isArray(p.riders)) {
+            setSelected(p.riders);
+          }
+        } catch {}
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [status]);
 
   const lockInfo = useMemo(() => {
     if (!config?.lockAtIso) return null;
@@ -115,13 +137,12 @@ export default function MiEquipoPage() {
     return map;
   }, [selectedRows]);
 
-  const canSelectMore = config && selected.length < config.squadSize;
+  const canSelectMore = config && selected.length < (config?.squadSize ?? 0);
 
   function canToggle(r: StartlistRow) {
     if (!config) return false;
     const already = selected.includes(r.Rider);
-    if (already) return true; // deseleccionar siempre
-
+    if (already) return true;
     if (!canSelectMore) return false;
     if (totalValue + (r.FinalValue || 0) > config.budget) return false;
     const t = (countsByTeam.get(r.Team) || 0) + 1;
@@ -130,10 +151,11 @@ export default function MiEquipoPage() {
   }
 
   function toggle(r: StartlistRow) {
-    if (!canToggle(r)) return;
-    setSelected((prev) =>
-      prev.includes(r.Rider) ? prev.filter((x) => x !== r.Rider) : [...prev, r.Rider]
-    );
+    setSelected((prev) => {
+      if (prev.includes(r.Rider)) return prev.filter((x) => x !== r.Rider);
+      if (!canToggle(r)) return prev;
+      return Array.from(new Set([...prev, r.Rider]));
+    });
   }
 
   const validToSave = useMemo(() => {
@@ -141,9 +163,7 @@ export default function MiEquipoPage() {
     if (lockInfo?.locked) return false;
     if (selected.length !== config.squadSize) return false;
     if (totalValue > config.budget) return false;
-    for (const [, n] of countsByTeam) {
-      if (n > config.maxPorEquipo) return false;
-    }
+    for (const [, n] of countsByTeam) if (n > config.maxPorEquipo) return false;
     return true;
   }, [config, lockInfo, selected.length, totalValue, countsByTeam]);
 
@@ -156,13 +176,18 @@ export default function MiEquipoPage() {
       const res = await fetch("/api/picks/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({ riders: selected }),
       });
       const json = await res.json();
-      if (!res.ok || !json?.ok) {
-        throw new Error(json?.error ?? "No se pudo guardar");
-      }
+      if (!res.ok || !json?.ok) throw new Error(json?.error ?? "No se pudo guardar");
       setNotice("Equipo guardado con éxito.");
+
+      // Re-fetch garantizado
+      try {
+        const p = await fetch("/api/picks/mine", { cache: "no-store" }).then((r) => r.json());
+        if (p?.ok && Array.isArray(p.riders)) setSelected(p.riders);
+      } catch {}
     } catch (e: any) {
       setError(e?.message ?? "Error al guardar");
     } finally {
@@ -206,7 +231,17 @@ export default function MiEquipoPage() {
 
   return (
     <div className="max-w-7xl mx-auto py-8 space-y-6">
-      {/* Top bar STICKY */}
+      {lockInfo?.locked && (
+        <div className="alert alert-warning">
+          <div>
+            <h3 className="font-semibold">Plantillas bloqueadas</h3>
+            <p className="opacity-80">
+              El plazo de cambios cerró el {lockInfo.localStr}. Tu equipo queda congelado hasta el final de la carrera.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="sticky top-0 z-20 backdrop-blur supports-[backdrop-filter]:bg-zinc-900/70 bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5 shadow-xl">
         <div className="flex flex-wrap items-center gap-4 justify-between">
           <div className="flex flex-wrap items-center gap-4">
@@ -224,44 +259,31 @@ export default function MiEquipoPage() {
             </div>
             <div className="kpi">Máx/equipo: {config.maxPorEquipo}</div>
             {lockInfo && (
-              <div
-                className={`badge ${lockInfo.locked ? "badge-error" : "badge-success"} text-sm`}
-                title={lockInfo.iso}
-              >
+              <div className={`badge ${lockInfo.locked ? "badge-error" : "badge-success"} text-sm`} title={lockInfo.iso}>
                 {lockInfo.locked ? "LOCKED" : `Lock: ${lockInfo.localStr}`}
               </div>
             )}
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              className="btn btn-ghost"
-              onClick={resetSelection}
-              disabled={saving || lockInfo?.locked}
-            >
+            <button className="btn btn-ghost" onClick={resetSelection} disabled={saving || lockInfo?.locked}>
               Reset
             </button>
             <button
               className="btn btn-primary"
               onClick={saveTeam}
-              disabled={!validToSave || saving}
+              disabled={!validToSave || saving || status !== "authenticated"}
               title={!validToSave ? "Ajusta selección para cumplir reglas" : "Guardar equipo"}
             >
               {saving ? "Guardando…" : "Guardar equipo"}
             </button>
           </div>
         </div>
-        {notice && (
-          <div className="text-sm text-emerald-400 mt-2">{notice}</div>
-        )}
-        {error && (
-          <div className="text-sm text-red-400 mt-2">{error}</div>
-        )}
+        {notice && <div className="text-sm text-emerald-400 mt-2">{notice}</div>}
+        {error && <div className="text-sm text-red-400 mt-2">{error}</div>}
       </div>
 
-      {/* Layout: filtros + grid */}
       <div className="grid md:grid-cols-[280px_1fr] gap-6">
-        {/* Filtros */}
         <aside className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-5 shadow-xl space-y-4 h-fit sticky top-28">
           <div>
             <label className="text-xs subtle">Buscar</label>
@@ -274,11 +296,7 @@ export default function MiEquipoPage() {
           </div>
           <div>
             <label className="text-xs subtle">Rol</label>
-            <select
-              className="select select-bordered w-full mt-1"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-            >
+            <select className="select select-bordered w-full mt-1" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
               {roles.map((r) => (
                 <option key={r} value={r}>
                   {r}
@@ -288,11 +306,7 @@ export default function MiEquipoPage() {
           </div>
           <div>
             <label className="text-xs subtle">Equipo</label>
-            <select
-              className="select select-bordered w-full mt-1"
-              value={teamFilter}
-              onChange={(e) => setTeamFilter(e.target.value)}
-            >
+            <select className="select select-bordered w-full mt-1" value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
               {teams.map((t) => (
                 <option key={t} value={t}>
                   {t}
@@ -314,7 +328,6 @@ export default function MiEquipoPage() {
           </div>
         </aside>
 
-        {/* Grid corredores */}
         <main>
           {filtered.length === 0 ? (
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 text-zinc-400">
@@ -324,13 +337,13 @@ export default function MiEquipoPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
               {filtered.map((r) => {
                 const isSelected = selected.includes(r.Rider);
-                const disabled = !isSelected && !canToggle(r);
+                const disabled = lockInfo?.locked || (!isSelected && !canToggle(r));
                 return (
                   <article
                     key={r.Rider}
-                    className={`card card-hover transition ${
-                      isSelected ? "ring-2 ring-brand/70" : ""
-                    } ${disabled ? "opacity-50 pointer-events-none" : "cursor-pointer"}`}
+                    className={`card card-hover transition ${isSelected ? "ring-2 ring-brand/70" : ""} ${
+                      disabled ? "opacity-50 pointer-events-none" : "cursor-pointer"
+                    }`}
                     onClick={() => toggle(r)}
                   >
                     <div className="flex items-start justify-between">
@@ -354,13 +367,12 @@ export default function MiEquipoPage() {
                     </div>
                     <div className="mt-3">
                       <button
-                        className={`btn btn-sm w-full ${
-                          isSelected ? "btn-primary" : "btn-ghost"
-                        }`}
+                        className={`btn btn-sm w-full ${isSelected ? "btn-primary" : "btn-ghost"}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggle(r);
                         }}
+                        disabled={!!lockInfo?.locked}
                       >
                         {isSelected ? "Quitar" : "Añadir"}
                       </button>
@@ -373,13 +385,11 @@ export default function MiEquipoPage() {
         </main>
       </div>
 
-      {/* Barra inferior (seleccionados) */}
       <div className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-5 shadow-xl">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="text-sm subtle">Seleccionados</div>
           <div className="text-sm text-zinc-400">
-            Total: <b>{totalValue}</b> · Corredores: <b>{selected.length}</b> /{" "}
-            {config.squadSize}
+            Total: <b>{totalValue}</b> · Corredores: <b>{selected.length}</b> / {config.squadSize}
           </div>
         </div>
         {selectedRows.length === 0 ? (
@@ -387,10 +397,7 @@ export default function MiEquipoPage() {
         ) : (
           <ul className="mt-3 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
             {selectedRows.map((r) => (
-              <li
-                key={r.Rider}
-                className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 flex items-center justify-between"
-              >
+              <li key={r.Rider} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 flex items-center justify-between">
                 <div className="min-w-0">
                   <div className="truncate font-medium">{r.Rider}</div>
                   <div className="text-xs text-zinc-400 truncate">{r.Team}</div>
@@ -399,9 +406,8 @@ export default function MiEquipoPage() {
                   <span className="text-sm font-semibold">{r.FinalValue}</span>
                   <button
                     className="btn btn-xs btn-ghost"
-                    onClick={() =>
-                      setSelected((prev) => prev.filter((x) => x !== r.Rider))
-                    }
+                    onClick={() => setSelected((prev) => prev.filter((x) => x !== r.Rider))}
+                    disabled={!!lockInfo?.locked}
                   >
                     Quitar
                   </button>
